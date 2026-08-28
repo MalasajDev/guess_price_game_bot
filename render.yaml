@@ -4,7 +4,6 @@ services:
     runtime: python
     plan: starter
     buildCommand: pip install .
-    preDeployCommand: python -m alembic upgrade head
     startCommand: guess-price-bot
     healthCheckPath: /health
     autoDeployTrigger: commit
