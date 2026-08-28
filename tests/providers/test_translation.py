@@ -1,6 +1,7 @@
-import httpx
 import asyncio
 import time
+
+import httpx
 
 from guess_price_bot.providers.translation import MyMemoryTranslator
 
@@ -36,3 +37,14 @@ async def test_translator_translates_card_fields_concurrently(client_factory):
         await MyMemoryTranslator(client).translate_card("Camera", "New camera")
 
     assert time.perf_counter() - started_at < 0.09
+
+
+async def test_translator_returns_original_card_when_api_rate_limits(client_factory):
+    def handler(request):
+        return httpx.Response(429)
+
+    async with client_factory(handler) as client:
+        translated = await MyMemoryTranslator(client).translate_card("Camera", "New camera")
+
+    assert translated.title == "Camera"
+    assert translated.description == "New camera"

@@ -14,9 +14,12 @@ class MyMemoryTranslator:
         self.contact_email = contact_email
 
     async def translate_card(self, title: str, description: str) -> TranslatedCard:
-        translated_title, translated_description = await asyncio.gather(
-            self._translate(title), self._translate(description)
-        )
+        try:
+            translated_title, translated_description = await asyncio.gather(
+                self._translate(title), self._translate(description)
+            )
+        except ProviderUnavailable:
+            return TranslatedCard(title=title, description=description)
         return TranslatedCard(title=translated_title, description=translated_description)
 
     async def _translate(self, text: str) -> str:
