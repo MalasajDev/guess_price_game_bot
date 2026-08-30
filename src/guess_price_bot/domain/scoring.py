@@ -4,7 +4,7 @@ from decimal import Decimal, InvalidOperation
 
 from guess_price_bot.domain.models import AnswerResult, Category
 
-MAX_GUESS_ERROR = Decimal("0.35")
+MAX_GUESS_ERROR = Decimal("0.30")
 
 
 def parse_guess(text: str) -> Decimal:

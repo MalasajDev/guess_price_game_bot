@@ -56,6 +56,7 @@ def render_card(card: RoundView, *, max_length: int | None = None) -> str:
             f"📝 {rendered_description}\n\n"
             f"{details}\n"
             f'🔗 <a href="{source_url}">Источник цены</a>'
+            f"‼️Чтобы угадывать цену нужно отвечать только на ЭТО сообщение!!!"
         )
 
     rendered = build(title, description)
