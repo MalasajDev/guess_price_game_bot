@@ -84,3 +84,9 @@ Copy `.env.example` to `.env` and set the following values. Never commit `.env`.
 - Structured logs designed for hosted environments
 - Secret validation and redaction-aware configuration
 - Adversarial and integration tests for state, Telegram, and untrusted remote images
+
+## Health monitoring 🩺
+
+The service exposes `GET /health` and `HEAD /health`. Render checks this route through
+`healthCheckPath`, and UptimeRobot monitors
+`https://guess-price-game-bot.onrender.com/health` every five minutes.

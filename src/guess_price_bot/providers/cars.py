@@ -67,11 +67,17 @@ class CarsProvider:
 
 
 def _usable(item: dict) -> bool:
+    if not isinstance(item, dict):
+        return False
     vehicle = item.get("vehicle") or {}
     listing = item.get("retailListing") or {}
+    if not isinstance(vehicle, dict) or not isinstance(listing, dict):
+        return False
     try:
         decimal_price(listing.get("price"))
-    except ProviderUnavailable:
+        if listing.get("miles") is not None:
+            int(listing["miles"])
+    except (ProviderUnavailable, TypeError, ValueError):
         return False
     return bool(
         item.get("vin")

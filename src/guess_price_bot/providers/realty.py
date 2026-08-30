@@ -59,14 +59,19 @@ class RealtyProvider:
 
 
 def _usable(item: dict) -> bool:
+    if not isinstance(item, dict):
+        return False
     try:
-        return bool(
+        usable = bool(
             item.get("externalID")
             and _title(item)
             and item.get("coverPhoto", {}).get("url")
             and decimal_price(item.get("price"))
         )
-    except ProviderUnavailable:
+        if item.get("area"):
+            _format_area(item["area"])
+        return usable
+    except (AttributeError, ProviderUnavailable, TypeError, ValueError):
         return False
 
 
@@ -76,7 +81,7 @@ def _card(item: dict) -> ListingCard:
         value
         for value in (
             location,
-            f"{item['area']:g} ft²" if item.get("area") else "",
+            _format_area(item["area"]) if item.get("area") else "",
             f"{item['rooms']} bedrooms" if item.get("rooms") is not None else "",
             f"{item['baths']} bathrooms" if item.get("baths") is not None else "",
         )
@@ -110,3 +115,7 @@ def _location_name(item: object) -> str:
             return str(name.get("en") or next(iter(name.values()), ""))
         return str(name)
     return str(item)
+
+
+def _format_area(value: object) -> str:
+    return f"{float(value):g} ft²"

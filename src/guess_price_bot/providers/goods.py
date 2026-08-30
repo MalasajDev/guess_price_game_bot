@@ -53,7 +53,10 @@ class GoodsProvider:
             if response.status_code in (402, 403, 429):
                 raise ProviderQuotaExceeded("SerpApi quota exhausted")
             response.raise_for_status()
-            products = response.json().get("shopping_results", [])
+            payload = response.json()
+            if not isinstance(payload, dict):
+                raise ValueError("unexpected response payload")
+            products = payload.get("shopping_results", [])
             usable = [item for item in products if _usable(item)]
             item = self.rng.choice(usable)
             return ListingCard(
@@ -76,6 +79,8 @@ class GoodsProvider:
 
 
 def _usable(item: dict) -> bool:
+    if not isinstance(item, dict):
+        return False
     try:
         decimal_price(item.get("extracted_price"))
     except ProviderUnavailable:

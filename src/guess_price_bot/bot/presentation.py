@@ -38,20 +38,54 @@ CURRENCY_SYMBOLS = {
 }
 
 
-def render_card(card: RoundView) -> str:
+def render_card(card: RoundView, *, max_length: int | None = None) -> str:
     symbol = CURRENCY_SYMBOLS[card.currency]
     details = (
         f"📈 Этот объект стоит больше {format_price(card.threshold)} {symbol}?"
         if card.mode is GameMode.MORE_LESS
         else f"💭 Как вы думаете, сколько это стоит в {symbol}?"
     )
-    return (
-        f"{CARD_INTRO}\n\n"
-        f"🏷 <b>{escape(card.title)}</b>\n"
-        f"📝 {escape(card.description)}\n\n"
-        f"{details}\n"
-        f'🔗 <a href="{escape(card.source_url, quote=True)}">Источник цены</a>'
+    title = escape(card.title)
+    description = escape(card.description)
+    source_url = escape(card.source_url, quote=True)
+
+    def build(rendered_title: str, rendered_description: str) -> str:
+        return (
+            f"{CARD_INTRO}\n\n"
+            f"🏷 <b>{rendered_title}</b>\n"
+            f"📝 {rendered_description}\n\n"
+            f"{details}\n"
+            f'🔗 <a href="{source_url}">Источник цены</a>'
+        )
+
+    rendered = build(title, description)
+    if max_length is None or len(rendered) <= max_length:
+        return rendered
+
+    empty_fields_length = len(rendered) - len(title) - len(description)
+    field_budget = max(0, max_length - empty_fields_length)
+    title_budget = field_budget // 2
+    description_budget = field_budget - title_budget
+    return build(
+        _escaped_prefix(card.title, title_budget),
+        _escaped_prefix(card.description, description_budget),
     )
+
+
+def _escaped_prefix(value: str, limit: int) -> str:
+    escaped = escape(value)
+    if len(escaped) <= limit:
+        return escaped
+    if limit <= 1:
+        return "…"[:limit]
+    low, high = 0, len(value)
+    while low < high:
+        middle = (low + high + 1) // 2
+        if len(escape(value[:middle])) <= limit - 1:
+            low = middle
+        else:
+            high = middle - 1
+    return escape(value[:low]) + "…"
 
 
 def render_answer(answer: AnswerView) -> str:
@@ -71,13 +105,17 @@ def render_group_miss() -> str:
 def render_who_closer_winner(result: WhoCloserResult) -> str:
     symbol = CURRENCY_SYMBOLS[result.currency]
     winner = result.winner_name or "никто"
-    return f"🏆 Игрок {escape(winner)} победил!\n\n💰 Реальная цена: {format_price(result.actual_price)} {symbol}"
+    return (
+        f"🏆 Игрок {escape(winner)} победил!\n\n"
+        f"💰 Реальная цена: {format_price(result.actual_price)} {symbol}"
+    )
 
 
 def render_who_closer_answers(result: WhoCloserResult) -> str:
     symbol = CURRENCY_SYMBOLS[result.currency]
     rows = [
-        f"• {escape(name)} — {'Не ответил' if price is None else format_price(price) + ' ' + symbol}"
+        f"• {escape(name)} — "
+        f"{'Не ответил' if price is None else format_price(price) + ' ' + symbol}"
         for name, price in result.answers
     ]
     return "📝 Игроки ввели:\n" + "\n".join(rows)

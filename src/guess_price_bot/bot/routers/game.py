@@ -4,16 +4,16 @@ import time
 import httpx
 import structlog
 from aiogram import F, Router
-from aiogram.filters import Command
 from aiogram.exceptions import TelegramBadRequest
+from aiogram.filters import Command
 from aiogram.types import CallbackQuery, ChatPermissions, Message, ReplyKeyboardRemove
 
 from guess_price_bot.bot.chat_type import is_private_chat
 from guess_price_bot.bot.keyboards import (
     comparison_menu,
     currency_menu,
-    main_menu,
     group_skip_menu,
+    main_menu,
     personal_game_menu,
     round_menu,
     skip_vote_menu,
@@ -74,14 +74,20 @@ async def send_card(message: Message, card: RoundView, _client: httpx.AsyncClien
             total_ms=round((time.perf_counter() - started_at) * 1000, 1),
         )
         if chat is not None and is_private_chat(chat.type):
-            await message.answer("⏭️ Для пропуска используйте кнопку ниже.", reply_markup=personal_game_menu())
+            await message.answer(
+                "⏭️ Для пропуска используйте кнопку ниже.",
+                reply_markup=personal_game_menu(),
+            )
         return sent
     except TelegramBadRequest:
         logger.info("card_url_rejected", source_url=card.source_url)
         logger.warning("card_image_unavailable", source_url=card.source_url)
-        sent = await message.answer(caption, reply_markup=markup)
+        sent = await message.answer(render_card(card, max_length=4096), reply_markup=markup)
         if chat is not None and is_private_chat(chat.type):
-            await message.answer("⏭️ Для пропуска используйте кнопку ниже.", reply_markup=personal_game_menu())
+            await message.answer(
+                "⏭️ Для пропуска используйте кнопку ниже.",
+                reply_markup=personal_game_menu(),
+            )
         return sent
 
 
@@ -318,13 +324,14 @@ async def skip_personal(event: Message | CallbackQuery, app: AppContext) -> None
         await message.answer(PROVIDER_ERROR)
 
 
-skip_votes: dict[int, dict[int, bool]] = {}
-skip_vote_permissions: dict[int, ChatPermissions | None] = {}
+VoteKey = tuple[int, int]
+skip_votes: dict[VoteKey, dict[int, bool]] = {}
+skip_vote_permissions: dict[VoteKey, ChatPermissions | None] = {}
 
 
-async def close_group_skip_vote(app: AppContext, message: Message, vote_id: int) -> None:
+async def close_group_skip_vote(app: AppContext, message: Message, vote_key: VoteKey) -> None:
     await asyncio.sleep(60)
-    votes = skip_votes.pop(vote_id, {})
+    votes = skip_votes.pop(vote_key, {})
     try:
         if sum(votes.values()) <= len(votes) - sum(votes.values()):
             await message.bot.send_message(
@@ -341,7 +348,7 @@ async def close_group_skip_vote(app: AppContext, message: Message, vote_id: int)
             f"⏭️ Карточка скипнута!\n\n💰 Реальная цена была: {result.actual_price}",
         )
     finally:
-        permissions = skip_vote_permissions.pop(vote_id, None)
+        permissions = skip_vote_permissions.pop(vote_key, None)
         if permissions is not None:
             try:
                 await message.bot.set_chat_permissions(message.chat.id, permissions=permissions)
@@ -360,9 +367,10 @@ async def request_group_skip(event: Message | CallbackQuery, app: AppContext) ->
     vote = await message.answer(
         "🗳️ Желаете скипнуть карточку? Голосование: 1 минута.", reply_markup=skip_vote_menu()
     )
+    vote_key = (message.chat.id, vote.message_id)
     try:
         chat = await message.bot.get_chat(message.chat.id)
-        skip_vote_permissions[vote.message_id] = chat.permissions
+        skip_vote_permissions[vote_key] = chat.permissions
         await message.bot.set_chat_permissions(
             message.chat.id, permissions=ChatPermissions(can_send_messages=False)
         )
@@ -370,8 +378,8 @@ async def request_group_skip(event: Message | CallbackQuery, app: AppContext) ->
         await message.answer(
             "⚠️ Для блокировки сообщений во время голосования выдайте боту право менять разрешения."
         )
-    skip_votes[vote.message_id] = {}
-    asyncio.create_task(close_group_skip_vote(app, vote, vote.message_id))
+    skip_votes[vote_key] = {}
+    asyncio.create_task(close_group_skip_vote(app, vote, vote_key))
 
 
 @router.callback_query(F.data.startswith("skipvote:"))
@@ -379,7 +387,8 @@ async def group_skip_vote(callback: CallbackQuery) -> None:
     if callback.message is None:
         await callback.answer()
         return
-    votes = skip_votes.setdefault(callback.message.message_id, {})
+    vote_key = (callback.message.chat.id, callback.message.message_id)
+    votes = skip_votes.setdefault(vote_key, {})
     votes[callback.from_user.id] = callback.data.endswith("yes")
     yes = sum(votes.values())
     no = len(votes) - yes

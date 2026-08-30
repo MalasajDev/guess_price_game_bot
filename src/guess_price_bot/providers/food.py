@@ -65,14 +65,19 @@ class FoodProvider:
         )
 
     def _usable(self, item: dict) -> bool:
+        if not isinstance(item, dict):
+            return False
         product = item.get("product") or {}
+        if not isinstance(product, dict):
+            return False
         try:
             observed = _parse_date(item["date"])
             decimal_price(item.get("price"))
         except (KeyError, TypeError, ValueError, ProviderUnavailable):
             return False
         return bool(
-            product.get("product_name")
+            item.get("id")
+            and product.get("product_name")
             and product.get("image_url")
             and item.get("currency")
             and self.now() - observed <= self.max_age

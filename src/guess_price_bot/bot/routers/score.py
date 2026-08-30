@@ -6,6 +6,7 @@ from guess_price_bot.bot.presentation import render_rating, render_score
 from guess_price_bot.bot.runtime import AppContext
 
 router = Router(name="score")
+TELEGRAM_TEXT_LIMIT = 4096
 
 
 async def get_score(app: AppContext, telegram_id: int) -> int:
@@ -35,7 +36,24 @@ async def rating_command(message: Message, app: AppContext) -> None:
             message.chat.id, message.from_user.id, message.from_user.full_name
         )
         rating = await service.rating(message.chat.id)
-    await message.answer(render_rating(rating))
+    for chunk in _split_message(render_rating(rating)):
+        await message.answer(chunk)
+
+
+def _split_message(text: str, limit: int = TELEGRAM_TEXT_LIMIT) -> list[str]:
+    chunks: list[str] = []
+    current = ""
+    for line in text.splitlines(keepends=True):
+        if current and len(current) + len(line) > limit:
+            chunks.append(current.rstrip("\n"))
+            current = ""
+        while len(line) > limit:
+            chunks.append(line[:limit])
+            line = line[limit:]
+        current += line
+    if current:
+        chunks.append(current.rstrip("\n"))
+    return chunks or [""]
 
 
 @router.callback_query(F.data == "score")

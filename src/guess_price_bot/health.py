@@ -9,13 +9,16 @@ async def handle_health_request(reader: asyncio.StreamReader, writer: asyncio.St
         while await reader.readline() not in {b"\r\n", b"\n", b""}:
             pass
 
-        if request_line in {"GET / HTTP/1.1", "GET /health HTTP/1.1"}:
+        parts = request_line.split()
+        method, path = parts[:2] if len(parts) >= 2 else ("", "")
+        if method in {"GET", "HEAD"} and path in {"/", "/health"}:
+            body = b"" if method == "HEAD" else OK_BODY
             response = (
                 b"HTTP/1.1 200 OK\r\n"
                 b"Content-Type: application/json\r\n"
                 b"Content-Length: 15\r\n"
                 b"Connection: close\r\n\r\n"
-                + OK_BODY
+                + body
             )
         else:
             response = b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
